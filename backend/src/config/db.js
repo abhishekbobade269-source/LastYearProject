@@ -5,15 +5,17 @@ const path = require('path');
 
 dotenv.config();
 
+const connectionString = process.env.DATABASE_URL || 
+  `postgresql://${process.env.DB_USER || 'postgres'}:${process.env.DB_PASSWORD || 'postgres'}@${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 5432}/${process.env.DB_NAME || 'noc_verify_db'}`;
+
+const isLocalhost = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
+
 const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'noc_verify_db',
-  password: process.env.DB_PASSWORD || 'postgres',
-  port: parseInt(process.env.DB_PORT || '5432'),
+  connectionString,
+  ssl: isLocalhost ? false : { rejectUnauthorized: false },
 });
 
-// Fallback in-memory dataset matching the UI mockup if Postgres is not reachable
+// Fallback in-memory dataset
 let inMemoryStore = {
   stats: {
     totalSubmissions: 254,
@@ -121,16 +123,16 @@ let inMemoryStore = {
   ],
   expiryAlerts: [
     { id: 1, entity_name: 'Green Valley Industries', document_type: 'Pollution NOC', expiry_date: '2025-05-20', days_left: 8 },
-    { id: 2, entity_name: 'Sunrise Hotels Pvt. Ltd.', document_type: 'Fire NOC', expiry_date: '2025-05-25', days_left: 13 },
+    { id: 2, entity_name: 'Sunrise Hotels Pvt. Ltd.', document_type: 'Fire NOC', expiry_date: '25 May 2025', days_left: 13 },
     { id: 3, entity_name: 'Alpha Manufacturing', document_type: 'Factory Licence', expiry_date: '2025-06-05', days_left: 24 },
     { id: 4, entity_name: 'City Mall & Complex', document_type: 'Trade License', expiry_date: '2025-06-10', days_left: 29 }
   ],
   analytics: {
     breakdown: [
-      { name: 'Verified', value: 176, percentage: 69, color: '#22C55E' },
+      { name: 'Verified', value: 176, percentage: 69, color: '#10B981' },
       { name: 'Minor Issues', value: 48, percentage: 19, color: '#F59E0B' },
       { name: 'Major Issues', value: 20, percentage: 8, color: '#EF4444' },
-      { name: 'Incomplete', value: 10, percentage: 4, color: '#94A3B8' }
+      { name: 'Incomplete', value: 10, percentage: 4, color: '#64748B' }
     ],
     timeline: [
       { date: '1 May', submissions: 20, approved: 15 },
@@ -147,7 +149,7 @@ let isConnected = false;
 const initDb = async () => {
   try {
     const client = await pool.connect();
-    console.log('✅ Connected to PostgreSQL database');
+    console.log('✅ Connected to Cloud PostgreSQL (Neon.tech)');
     isConnected = true;
     
     // Execute DDL Schema script if available
@@ -155,11 +157,11 @@ const initDb = async () => {
     if (fs.existsSync(schemaPath)) {
       const sql = fs.readFileSync(schemaPath, 'utf8');
       await client.query(sql);
-      console.log('✅ Schema and seed data initialized in PostgreSQL');
+      console.log('✅ Schema and seed data initialized in Cloud PostgreSQL!');
     }
     client.release();
   } catch (err) {
-    console.warn('⚠️ Could not connect to PostgreSQL directly (Using high-speed resilient in-memory database fallback):', err.message);
+    console.warn('⚠️ Could not connect to PostgreSQL directly (Using fallback in-memory store):', err.message);
     isConnected = false;
   }
 };
