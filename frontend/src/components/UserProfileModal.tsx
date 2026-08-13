@@ -62,13 +62,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200/90 overflow-hidden relative animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 z-[100] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto my-auto min-h-screen">
+      <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200/90 overflow-hidden relative my-auto max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
         
         {/* Header Bar */}
-        <div className="px-6 py-5 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-950 text-white flex items-center justify-between border-b border-slate-800">
+        <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-950 text-white flex items-center justify-between border-b border-slate-800 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-base shadow-md ring-2 ring-white/20">
+            <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-md ring-2 ring-white/20">
               RS
             </div>
             <div>
@@ -89,10 +89,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         </div>
 
         {/* Modal Navigation Tabs */}
-        <div className="flex border-b border-slate-200/80 bg-slate-50/80 px-6 pt-2 gap-2">
+        <div className="flex border-b border-slate-200/80 bg-slate-50/90 px-6 pt-2 gap-2 flex-shrink-0 overflow-x-auto">
           <button
             onClick={() => setActiveTab('profile')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold border-b-2 transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'profile'
                 ? 'border-blue-600 text-blue-600 bg-white rounded-t-xl shadow-xs'
                 : 'border-transparent text-slate-500 hover:text-slate-900'
@@ -104,7 +104,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
           <button
             onClick={() => setActiveTab('security')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold border-b-2 transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'security'
                 ? 'border-blue-600 text-blue-600 bg-white rounded-t-xl shadow-xs'
                 : 'border-transparent text-slate-500 hover:text-slate-900'
@@ -116,7 +116,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
           <button
             onClick={() => setActiveTab('permissions')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold border-b-2 transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'permissions'
                 ? 'border-blue-600 text-blue-600 bg-white rounded-t-xl shadow-xs'
                 : 'border-transparent text-slate-500 hover:text-slate-900'
@@ -128,7 +128,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
           <button
             onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold border-b-2 transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'settings'
                 ? 'border-blue-600 text-blue-600 bg-white rounded-t-xl shadow-xs'
                 : 'border-transparent text-slate-500 hover:text-slate-900'
@@ -140,7 +140,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         </div>
 
         {/* Tab Content Body */}
-        <div className="p-6 max-h-[500px] overflow-y-auto custom-scrollbar">
+        <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
 
           {/* TAB 1: MY PROFILE */}
           {activeTab === 'profile' && (
