@@ -62,8 +62,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto my-auto min-h-screen">
-      <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200/90 overflow-hidden relative my-auto max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md overflow-y-auto p-4 sm:p-6 flex items-start justify-center">
+      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden mt-10 sm:mt-14 mb-10 flex flex-col animate-in fade-in zoom-in duration-200">
         
         {/* Header Bar */}
         <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-950 text-white flex items-center justify-between border-b border-slate-800 flex-shrink-0">
@@ -140,7 +140,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         </div>
 
         {/* Tab Content Body */}
-        <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+        <div className="p-6 overflow-y-auto custom-scrollbar flex-1 max-h-[60vh]">
 
           {/* TAB 1: MY PROFILE */}
           {activeTab === 'profile' && (
