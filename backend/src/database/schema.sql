@@ -1,11 +1,13 @@
--- NOC VERIFY PostgreSQL Database Schema
+-- NOC VERIFY Enterprise PostgreSQL Database Schema (BRD Compliant)
 
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    role VARCHAR(50) NOT NULL DEFAULT 'Officer', -- 'Officer', 'EntityAdmin', 'SuperAdmin'
+    password_hash VARCHAR(255) DEFAULT '$2a$10$abcdefghijklmnopqrstuv',
+    role VARCHAR(50) NOT NULL DEFAULT 'Officer', -- 'Officer', 'EntityAdmin', 'SeniorOfficer', 'Admin', 'Auditor'
     department VARCHAR(100),
+    mfa_enabled BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -19,9 +21,20 @@ CREATE TABLE IF NOT EXISTS entities (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS noc_types (
+    id SERIAL PRIMARY KEY,
+    type_name VARCHAR(100) UNIQUE NOT NULL,
+    issuing_authority VARCHAR(255) NOT NULL,
+    sla_days INT DEFAULT 15,
+    alert_threshold_days INT DEFAULT 30,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS noc_submissions (
     id SERIAL PRIMARY KEY,
     entity_id INT REFERENCES entities(id) ON DELETE CASCADE,
+    parent_submission_id INT REFERENCES noc_submissions(id) ON DELETE SET NULL,
+    version_number INT DEFAULT 1,
     entity_name VARCHAR(255) NOT NULL,
     document_type VARCHAR(100) NOT NULL, -- 'Fire NOC', 'Pollution NOC', 'Building Plan Approval', 'Trade License', 'Factory Licence'
     certificate_number VARCHAR(100),
@@ -32,8 +45,7 @@ CREATE TABLE IF NOT EXISTS noc_submissions (
     location TEXT,
     ai_status VARCHAR(50) NOT NULL DEFAULT 'Pending', -- 'Verified', 'Minor Issues', 'Major Issues', 'Incomplete'
     ai_confidence_score NUMERIC(5,2) DEFAULT 0.00,
-    ai_extraction_summary JSONB,
-    officer_status VARCHAR(50) NOT NULL DEFAULT 'Pending Review', -- 'Approved', 'Pending Review', 'Rejected', 'Revision Requested'
+    officer_status VARCHAR(50) NOT NULL DEFAULT 'Pending Review', -- 'Approved', 'Pending Review', 'Rejected', 'Correction Required'
     assigned_officer_id INT REFERENCES users(id) ON DELETE SET NULL,
     assigned_officer_name VARCHAR(255) DEFAULT 'R. Sharma',
     officer_notes TEXT,
@@ -45,12 +57,21 @@ CREATE TABLE IF NOT EXISTS noc_submissions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS ai_verification_results (
+    id SERIAL PRIMARY KEY,
+    submission_id INT REFERENCES noc_submissions(id) ON DELETE CASCADE,
+    extracted_fields JSONB NOT NULL,
+    anomaly_flags JSONB,
+    confidence_score NUMERIC(5,2) DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS audit_logs (
     id SERIAL PRIMARY KEY,
     submission_id INT REFERENCES noc_submissions(id) ON DELETE CASCADE,
     actor_name VARCHAR(255) NOT NULL,
     actor_role VARCHAR(50) NOT NULL,
-    action VARCHAR(100) NOT NULL, -- 'SUBMITTED', 'AI_ANALYZED', 'OFFICER_APPROVED', 'OFFICER_REJECTED', 'BLOCKCHAIN_ANCHORED'
+    action VARCHAR(100) NOT NULL, -- 'SUBMITTED', 'AI_ANALYZED', 'OFFICER_APPROVED', 'OFFICER_REJECTED', 'BLOCKCHAIN_ANCHORED', 'RENEWED'
     details TEXT,
     ip_address VARCHAR(50),
     blockchain_tx VARCHAR(255),
@@ -68,13 +89,23 @@ CREATE TABLE IF NOT EXISTS expiry_alerts (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Seed Initial Enterprise Demo Data matching mockup
+-- Seed NOC Types Configuration
+INSERT INTO noc_types (type_name, issuing_authority, sla_days, alert_threshold_days) VALUES
+('Fire NOC', 'Pune Fire Department', 15, 30),
+('Pollution NOC', 'State Pollution Control Board', 20, 30),
+('Building Plan Approval', 'Municipal Development Authority', 30, 60),
+('Trade License', 'Pune Municipal Corporation', 10, 30),
+('Factory Licence', 'Department of Factories Inspection', 25, 30)
+ON CONFLICT (type_name) DO NOTHING;
+
+-- Seed Users
 INSERT INTO users (name, email, role, department) VALUES
 ('R. Sharma', 'r.sharma@gov.in', 'Officer', 'Pune Fire Department'),
 ('A. Verma', 'a.verma@gov.in', 'Officer', 'State Pollution Control Board'),
-('M. Kulkarni', 'm.kulkarni@gov.in', 'SuperAdmin', 'Department of Municipal Administration')
+('M. Kulkarni', 'm.kulkarni@gov.in', 'SeniorOfficer', 'Department of Municipal Administration')
 ON CONFLICT (email) DO NOTHING;
 
+-- Seed Entities
 INSERT INTO entities (entity_name, registration_number, address, contact_email, status) VALUES
 ('Sunrise Hotels Pvt. Ltd.', 'REG-HOTEL-2025-01', '123, MG Road, Pune - 411001', 'compliance@sunrisehotels.com', 'Active'),
 ('Green Valley Industries', 'REG-IND-2025-02', 'Plot 45, MIDC Industrial Area, Pune - 411026', 'legal@greenvalley.com', 'Active'),
@@ -83,16 +114,18 @@ INSERT INTO entities (entity_name, registration_number, address, contact_email, 
 ('Alpha Manufacturing', 'REG-MFG-2025-05', 'Sector 12, Pimpri, Pune - 411018', 'admin@alphamfg.com', 'Active')
 ON CONFLICT (registration_number) DO NOTHING;
 
+-- Seed Submissions
 INSERT INTO noc_submissions 
-(entity_id, entity_name, document_type, certificate_number, issuing_authority, submitted_on, issue_date, expiry_date, location, ai_status, ai_confidence_score, officer_status, assigned_officer_name, blockchain_hash, blockchain_tx_hash, blockchain_block_number, blockchain_status) 
+(entity_id, version_number, entity_name, document_type, certificate_number, issuing_authority, submitted_on, issue_date, expiry_date, location, ai_status, ai_confidence_score, officer_status, assigned_officer_name, blockchain_hash, blockchain_tx_hash, blockchain_block_number, blockchain_status) 
 VALUES
-(1, 'Sunrise Hotels Pvt. Ltd.', 'Fire NOC', 'FD/2025/4587', 'Pune Fire Department', '2025-05-12', '2025-05-01', '2026-04-30', '123, MG Road, Pune - 411001', 'Verified', 98.50, 'Approved', 'R. Sharma', '0x8f7d9a1c2b3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a', '0x3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b', 18456321, 'Anchored'),
-(2, 'Green Valley Industries', 'Pollution NOC', 'PCB/2025/1102', 'State Pollution Control Board', '2025-05-11', '2024-05-20', '2025-05-20', 'Plot 45, MIDC Industrial Area, Pune', 'Verified', 94.20, 'Pending Review', 'R. Sharma', '0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b', '0x5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d', 18456290, 'Anchored'),
-(3, 'BuildTech Constructions', 'Building Plan Approval', 'BPA/2025/089', 'Municipal Development Authority', '2025-05-10', '2025-05-05', '2027-05-04', '78, Commercial Hub, Pune', 'Verified', 96.80, 'Approved', 'R. Sharma', '0x9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b', '0x7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f', 18456150, 'Anchored'),
-(4, 'City Mall & Complex', 'Trade License', 'TL/2025/041', 'Pune Municipal Corporation', '2025-05-09', '2024-06-10', '2025-06-10', 'City Mall, FC Road, Pune', 'Incomplete', 42.10, 'Rejected', 'R. Sharma', NULL, NULL, NULL, 'Not Anchored'),
-(5, 'Alpha Manufacturing', 'Factory Licence', 'FL/2025/673', 'Department of Factories Inspection', '2025-05-08', '2024-06-05', '2025-06-05', 'Sector 12, Pimpri, Pune', 'Verified', 91.00, 'Pending Review', 'R. Sharma', '0x4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c', '0x1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d', 18456012, 'Anchored')
+(1, 1, 'Sunrise Hotels Pvt. Ltd.', 'Fire NOC', 'FD/2025/4587', 'Pune Fire Department', '2025-05-12', '2025-05-01', '2026-04-30', '123, MG Road, Pune - 411001', 'Verified', 98.50, 'Approved', 'R. Sharma', '0x8f7d9a1c2b3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a', '0x3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b', 18456321, 'Anchored'),
+(2, 1, 'Green Valley Industries', 'Pollution NOC', 'PCB/2025/1102', 'State Pollution Control Board', '2025-05-11', '2024-05-20', '2025-05-20', 'Plot 45, MIDC Industrial Area, Pune', 'Verified', 94.20, 'Pending Review', 'R. Sharma', '0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b', '0x5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d', 18456290, 'Anchored'),
+(3, 1, 'BuildTech Constructions', 'Building Plan Approval', 'BPA/2025/089', 'Municipal Development Authority', '2025-05-10', '2025-05-05', '2027-05-04', '78, Commercial Hub, Pune', 'Verified', 96.80, 'Approved', 'R. Sharma', '0x9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b', '0x7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f', 18456150, 'Anchored'),
+(4, 1, 'City Mall & Complex', 'Trade License', 'TL/2025/041', 'Pune Municipal Corporation', '2025-05-09', '2024-06-10', '2025-06-10', 'City Mall, FC Road, Pune', 'Incomplete', 42.10, 'Rejected', 'R. Sharma', NULL, NULL, NULL, 'Not Anchored'),
+(5, 1, 'Alpha Manufacturing', 'Factory Licence', 'FL/2025/673', 'Department of Factories Inspection', '2025-05-08', '2024-06-05', '2025-06-05', 'Sector 12, Pimpri, Pune', 'Verified', 91.00, 'Pending Review', 'R. Sharma', '0x4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c', '0x1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d', 18456012, 'Anchored')
 ON CONFLICT DO NOTHING;
 
+-- Seed Expiry Alerts
 INSERT INTO expiry_alerts (submission_id, entity_name, document_type, expiry_date, days_left, status) VALUES
 (2, 'Green Valley Industries', 'Pollution NOC', '2025-05-20', 8, 'Active'),
 (1, 'Sunrise Hotels Pvt. Ltd.', 'Fire NOC', '2025-05-25', 13, 'Active'),

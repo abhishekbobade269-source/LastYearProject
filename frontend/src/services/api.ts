@@ -10,6 +10,8 @@ export interface DashboardStats {
 
 export interface Submission {
   id: number;
+  parent_submission_id?: number | null;
+  version_number?: number;
   entity_name: string;
   document_type: string;
   certificate_number: string;
@@ -20,7 +22,7 @@ export interface Submission {
   location: string;
   ai_status: 'Verified' | 'Minor Issues' | 'Major Issues' | 'Incomplete';
   ai_confidence_score: number;
-  officer_status: 'Approved' | 'Pending Review' | 'Rejected' | 'Revision Requested';
+  officer_status: 'Approved' | 'Pending Review' | 'Rejected' | 'Correction Required';
   assigned_officer_name: string;
   blockchain_hash: string | null;
   blockchain_tx_hash: string | null;
@@ -53,12 +55,13 @@ export const fetchDashboardStats = async (): Promise<DashboardStats> => {
   };
 };
 
-export const fetchSubmissions = async (search?: string, ai_status?: string, officer_status?: string): Promise<Submission[]> => {
+export const fetchSubmissions = async (search?: string, ai_status?: string, officer_status?: string, document_type?: string): Promise<Submission[]> => {
   try {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     if (ai_status) params.append('ai_status', ai_status);
     if (officer_status) params.append('officer_status', officer_status);
+    if (document_type) params.append('document_type', document_type);
 
     const res = await fetch(`${API_BASE}/submissions?${params.toString()}`);
     if (res.ok) return await res.json();
@@ -68,6 +71,7 @@ export const fetchSubmissions = async (search?: string, ai_status?: string, offi
   return [
     {
       id: 1,
+      version_number: 1,
       entity_name: 'Sunrise Hotels Pvt. Ltd.',
       document_type: 'Fire NOC',
       certificate_number: 'FD/2025/4587',
@@ -87,6 +91,7 @@ export const fetchSubmissions = async (search?: string, ai_status?: string, offi
     },
     {
       id: 2,
+      version_number: 1,
       entity_name: 'Green Valley Industries',
       document_type: 'Pollution NOC',
       certificate_number: 'PCB/2025/1102',
@@ -106,6 +111,7 @@ export const fetchSubmissions = async (search?: string, ai_status?: string, offi
     },
     {
       id: 3,
+      version_number: 1,
       entity_name: 'BuildTech Constructions',
       document_type: 'Building Plan Approval',
       certificate_number: 'BPA/2025/089',
@@ -125,6 +131,7 @@ export const fetchSubmissions = async (search?: string, ai_status?: string, offi
     },
     {
       id: 4,
+      version_number: 1,
       entity_name: 'City Mall & Complex',
       document_type: 'Trade License',
       certificate_number: 'TL/2025/041',
@@ -144,6 +151,7 @@ export const fetchSubmissions = async (search?: string, ai_status?: string, offi
     },
     {
       id: 5,
+      version_number: 1,
       entity_name: 'Alpha Manufacturing',
       document_type: 'Factory Licence',
       certificate_number: 'FL/2025/673',
@@ -195,5 +203,22 @@ export const reviewSubmission = async (id: number, status: string, notes?: strin
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status, notes })
   });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Review failed');
+  }
+  return await res.json();
+};
+
+export const renewCertificate = async (id: number): Promise<Submission> => {
+  const res = await fetch(`${API_BASE}/submissions/${id}/renew`, {
+    method: 'POST'
+  });
+  const json = await res.json();
+  return json.data;
+};
+
+export const verifyOnChainHash = async (id: number) => {
+  const res = await fetch(`${API_BASE}/submissions/${id}/verify-hash`);
   return await res.json();
 };

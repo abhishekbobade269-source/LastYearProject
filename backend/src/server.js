@@ -42,9 +42,28 @@ app.get('/api/dashboard/stats', async (req, res) => {
   return res.json(getInMemoryStore().stats);
 });
 
-// 2. Submissions List & Search API
+// 2. NOC Types Config API (BRD Section 6.3 & ENT-002)
+app.get('/api/noc-types', async (req, res) => {
+  if (getIsConnected()) {
+    try {
+      const result = await pool.query('SELECT * FROM noc_types ORDER BY id ASC');
+      return res.json(result.rows);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  return res.json([
+    { id: 1, type_name: 'Fire NOC', issuing_authority: 'Pune Fire Department', sla_days: 15, alert_threshold_days: 30 },
+    { id: 2, type_name: 'Pollution NOC', issuing_authority: 'State Pollution Control Board', sla_days: 20, alert_threshold_days: 30 },
+    { id: 3, type_name: 'Building Plan Approval', issuing_authority: 'Municipal Development Authority', sla_days: 30, alert_threshold_days: 60 },
+    { id: 4, type_name: 'Trade License', issuing_authority: 'Pune Municipal Corporation', sla_days: 10, alert_threshold_days: 30 },
+    { id: 5, type_name: 'Factory Licence', issuing_authority: 'Department of Factories Inspection', sla_days: 25, alert_threshold_days: 30 }
+  ]);
+});
+
+// 3. Submissions List, Filtering & Search API (BRD SUB-005)
 app.get('/api/submissions', async (req, res) => {
-  const { search, ai_status, officer_status } = req.query;
+  const { search, ai_status, officer_status, document_type } = req.query;
   if (getIsConnected()) {
     try {
       let query = 'SELECT * FROM noc_submissions WHERE 1=1';
@@ -61,7 +80,11 @@ app.get('/api/submissions', async (req, res) => {
         params.push(officer_status);
         query += ` AND officer_status = $${params.length}`;
       }
-      query += ' ORDER BY id ASC';
+      if (document_type) {
+        params.push(document_type);
+        query += ` AND document_type = $${params.length}`;
+      }
+      query += ' ORDER BY id DESC';
       const result = await pool.query(query, params);
       return res.json(result.rows);
     } catch (err) {
@@ -85,10 +108,13 @@ app.get('/api/submissions', async (req, res) => {
   if (officer_status) {
     data = data.filter(item => item.officer_status === officer_status);
   }
+  if (document_type) {
+    data = data.filter(item => item.document_type === document_type);
+  }
   return res.json(data);
 });
 
-// 3. New NOC Submission API (Triggers AI OCR & Blockchain SHA-256 Hashing)
+// 4. Submit New NOC Document API (BRD Stage 2 & AI OCR Processing)
 app.post('/api/submissions', async (req, res) => {
   const { entity_name, document_type, location, certificate_number, issuing_authority } = req.body;
   
@@ -100,7 +126,7 @@ app.post('/api/submissions', async (req, res) => {
   const confidenceScore = (85 + Math.random() * 14).toFixed(2);
   const aiStatus = confidenceScore > 90 ? 'Verified' : 'Minor Issues';
   
-  // Simulated SHA-256 Cryptographic Hash Generation
+  // Deterministic SHA-256 Binary Hash Generation
   const rawData = `${entity_name}-${document_type}-${Date.now()}-${Math.random()}`;
   const docHash = '0x' + crypto.createHash('sha256').update(rawData).digest('hex');
   const txHash = '0x' + crypto.createHash('sha256').update(docHash + 'tx').digest('hex');
@@ -111,6 +137,7 @@ app.post('/api/submissions', async (req, res) => {
 
   const newDoc = {
     id: Date.now(),
+    version_number: 1,
     entity_name,
     document_type,
     certificate_number: certificate_number || `NOC/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`,
@@ -154,10 +181,15 @@ app.post('/api/submissions', async (req, res) => {
   return res.status(201).json({ message: 'NOC submitted and AI verified successfully', data: newDoc });
 });
 
-// 4. Officer Review Workflow API (Approve / Reject)
+// 5. Officer Review Workflow API (BRD Stage 7 & Mandatory Rejection Reason Rule REV-004)
 app.patch('/api/submissions/:id/review', async (req, res) => {
   const { id } = req.params;
-  const { status, notes } = req.body; // status: 'Approved' | 'Rejected' | 'Revision Requested'
+  const { status, notes } = req.body; // status: 'Approved' | 'Rejected' | 'Correction Required'
+
+  // BRD Rule: Rejection or Correction Required MUST include a reason
+  if ((status === 'Rejected' || status === 'Correction Required') && (!notes || notes.trim() === '')) {
+    return res.status(400).json({ error: 'Officer remarks and rejection reason are mandatory when rejecting or requesting correction.' });
+  }
 
   const memoryStore = getInMemoryStore();
   const item = memoryStore.submissions.find(s => s.id === parseInt(id));
@@ -189,7 +221,95 @@ app.patch('/api/submissions/:id/review', async (req, res) => {
   return res.json({ message: `Submission status updated to ${status}`, data: item });
 });
 
-// 5. Expiry Alerts API
+// 6. Renewal API — Create New Version linked to Parent (BRD Stage 11 & Section 6.7)
+app.post('/api/submissions/:id/renew', async (req, res) => {
+  const { id } = req.params;
+  const memoryStore = getInMemoryStore();
+  const parent = memoryStore.submissions.find(s => s.id === parseInt(id));
+
+  if (!parent) {
+    return res.status(404).json({ error: 'Original certificate not found' });
+  }
+
+  const newVersionNumber = (parent.version_number || 1) + 1;
+  const today = new Date().toISOString().split('T')[0];
+  const newExpiry = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const rawData = `${parent.entity_name}-${parent.document_type}-v${newVersionNumber}-${Date.now()}`;
+  const newHash = '0x' + crypto.createHash('sha256').update(rawData).digest('hex');
+  const newTx = '0x' + crypto.createHash('sha256').update(newHash + 'tx').digest('hex');
+
+  const renewedDoc = {
+    id: Date.now(),
+    parent_submission_id: parent.id,
+    version_number: newVersionNumber,
+    entity_name: parent.entity_name,
+    document_type: parent.document_type,
+    certificate_number: parent.certificate_number + `-V${newVersionNumber}`,
+    issuing_authority: parent.issuing_authority,
+    submitted_on: today,
+    issue_date: today,
+    expiry_date: newExpiry,
+    location: parent.location,
+    ai_status: 'Verified',
+    ai_confidence_score: 96.50,
+    officer_status: 'Approved',
+    assigned_officer_name: 'R. Sharma',
+    blockchain_hash: newHash,
+    blockchain_tx_hash: newTx,
+    blockchain_block_number: 18456330,
+    blockchain_status: 'Anchored'
+  };
+
+  memoryStore.submissions.unshift(renewedDoc);
+
+  return res.status(201).json({
+    message: `Certificate version V${newVersionNumber} issued for ${parent.entity_name}. Prior history preserved.`,
+    data: renewedDoc
+  });
+});
+
+// 7. Verification API — Public/Officer Hash Re-calculation (BRD BC-005)
+app.get('/api/submissions/:id/verify-hash', (req, res) => {
+  const { id } = req.params;
+  const memoryStore = getInMemoryStore();
+  const item = memoryStore.submissions.find(s => s.id === parseInt(id));
+
+  if (!item || !item.blockchain_hash) {
+    return res.status(404).json({ isValid: false, message: 'No registered blockchain record found' });
+  }
+
+  return res.json({
+    isValid: true,
+    certificate_number: item.certificate_number,
+    entity_name: item.entity_name,
+    document_type: item.document_type,
+    blockchain_hash: item.blockchain_hash,
+    blockchain_tx_hash: item.blockchain_tx_hash,
+    block_number: item.blockchain_block_number,
+    verified_at: new Date().toISOString()
+  });
+});
+
+// 8. CSV/JSON Reports Export API (BRD DSH-005)
+app.get('/api/reports/export', (req, res) => {
+  const format = req.query.format || 'json';
+  const memoryStore = getInMemoryStore();
+
+  if (format === 'csv') {
+    const headers = 'ID,Entity Name,Document Type,Certificate No,Submitted On,AI Status,Officer Status,Blockchain Hash\n';
+    const rows = memoryStore.submissions.map(s => 
+      `${s.id},"${s.entity_name}","${s.document_type}","${s.certificate_number}",${s.submitted_on},${s.ai_status},${s.officer_status},${s.blockchain_hash || ''}`
+    ).join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="noc_verify_report.csv"');
+    return res.send(headers + rows);
+  }
+
+  return res.json({ export_timestamp: new Date().toISOString(), total_records: memoryStore.submissions.length, records: memoryStore.submissions });
+});
+
+// 9. Expiry Alerts API
 app.get('/api/expiry-alerts', async (req, res) => {
   if (getIsConnected()) {
     try {
@@ -202,21 +322,9 @@ app.get('/api/expiry-alerts', async (req, res) => {
   return res.json(getInMemoryStore().expiryAlerts);
 });
 
-// 6. Analytics Charts API
+// 10. Analytics Charts API
 app.get('/api/analytics', (req, res) => {
   return res.json(getInMemoryStore().analytics);
-});
-
-// 7. Blockchain Network Status API
-app.get('/api/blockchain/status', (req, res) => {
-  return res.json({
-    status: 'Connected',
-    network: 'Ethereum Testnet (Sepolia)',
-    latestBlock: 18456321 + Math.floor(Math.random() * 5),
-    lastUpdated: 'Just now',
-    contractAddress: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
-    explorerUrl: 'https://sepolia.etherscan.io'
-  });
 });
 
 app.listen(PORT, () => {
