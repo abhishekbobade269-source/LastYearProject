@@ -17,29 +17,63 @@ import {
   CheckCircle2 
 } from 'lucide-react';
 
+export interface UserProfileData {
+  name: string;
+  age: string;
+  gender: string;
+  email: string;
+  phone: string;
+  govId: string;
+  department: string;
+  designation: string;
+  dob: string;
+  address: string;
+}
+
+const DEFAULT_PROFILE: UserProfileData = {
+  name: 'R. Sharma',
+  age: '42',
+  gender: 'Male',
+  email: 'r.sharma@gov.in',
+  phone: '+91 98765 43210',
+  govId: 'GOV-PU-8942',
+  department: 'Pune Fire Department',
+  designation: 'Senior Approving Officer',
+  dob: '1983-08-14',
+  address: 'Central Fire Station, Station Road, Pune - 411001'
+};
+
 export const ProfileView: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Profile Form State
-  const [profileData, setProfileData] = useState({
-    name: 'R. Sharma',
-    age: '42',
-    gender: 'Male',
-    email: 'r.sharma@gov.in',
-    phone: '+91 98765 43210',
-    govId: 'GOV-PU-8942',
-    department: 'Pune Fire Department',
-    designation: 'Senior Approving Officer',
-    dob: '1983-08-14',
-    address: 'Central Fire Station, Station Road, Pune - 411001'
+  // Initialize from localStorage or default
+  const [profileData, setProfileData] = useState<UserProfileData>(() => {
+    const saved = localStorage.getItem('noc_user_profile');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return DEFAULT_PROFILE;
   });
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    // 1. Save to LocalStorage
+    localStorage.setItem('noc_user_profile', JSON.stringify(profileData));
+    
+    // 2. Dispatch custom event so Header updates immediately
+    window.dispatchEvent(new Event('userProfileUpdated'));
+
     setIsEditing(false);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(' ').filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return 'RS';
   };
 
   return (
@@ -48,7 +82,7 @@ export const ProfileView: React.FC = () => {
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-slate-900 via-slate-800 to-blue-900 text-white flex items-center justify-center font-black text-xl shadow-md ring-4 ring-blue-500/20">
-            {profileData.name.split(' ').map(n => n[0]).join('')}
+            {getInitials(profileData.name)}
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -85,7 +119,7 @@ export const ProfileView: React.FC = () => {
       {saveSuccess && (
         <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
           <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-          <span>Profile information updated successfully and synced across NOC VERIFY Platform!</span>
+          <span>Profile information saved to permanent storage and synced across Header!</span>
         </div>
       )}
 
@@ -235,7 +269,7 @@ export const ProfileView: React.FC = () => {
               className="px-6 py-2 text-xs font-extrabold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-md shadow-blue-500/20 flex items-center gap-2 cursor-pointer"
             >
               <Save className="w-4 h-4" />
-              <span>Save Profile Updates</span>
+              <span>Save & Persist Changes</span>
             </button>
           </div>
         </form>

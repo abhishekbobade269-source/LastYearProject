@@ -13,15 +13,46 @@ import {
   Mail,
   Building
 } from 'lucide-react';
+import { type UserProfileData } from './ProfileView';
 
 interface HeaderProps {
   activeTabTitle: string;
   onNavigateTab?: (tabId: string) => void;
 }
 
+const DEFAULT_HEADER_PROFILE: UserProfileData = {
+  name: 'R. Sharma',
+  age: '42',
+  gender: 'Male',
+  email: 'r.sharma@gov.in',
+  phone: '+91 98765 43210',
+  govId: 'GOV-PU-8942',
+  department: 'Pune Fire Department',
+  designation: 'Senior Approving Officer',
+  dob: '1983-08-14',
+  address: 'Central Fire Station, Station Road, Pune - 411001'
+};
+
 export const Header: React.FC<HeaderProps> = ({ activeTabTitle, onNavigateTab }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profile, setProfile] = useState<UserProfileData>(DEFAULT_HEADER_PROFILE);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const loadSavedProfile = () => {
+    const saved = localStorage.getItem('noc_user_profile');
+    if (saved) {
+      try {
+        setProfile(JSON.parse(saved));
+      } catch (e) {}
+    }
+  };
+
+  useEffect(() => {
+    loadSavedProfile();
+    const handleProfileUpdate = () => loadSavedProfile();
+    window.addEventListener('userProfileUpdated', handleProfileUpdate);
+    return () => window.removeEventListener('userProfileUpdated', handleProfileUpdate);
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -33,6 +64,13 @@ export const Header: React.FC<HeaderProps> = ({ activeTabTitle, onNavigateTab })
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(' ').filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return 'RS';
+  };
 
   const handleSelectTab = (tabId: string) => {
     if (onNavigateTab) {
@@ -56,7 +94,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTabTitle, onNavigateTab })
           <span>{activeTabTitle}</span>
         </h2>
         <p className="text-xs text-slate-500 font-medium mt-0.5">
-          Welcome back, Officer! Here's what's happening with NOC verification today.
+          Welcome back, {profile.name}! Here's what's happening with NOC verification today.
         </p>
       </div>
 
@@ -91,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTabTitle, onNavigateTab })
             {/* Avatar with Online Glow Indicator */}
             <div className="relative">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-slate-900 via-slate-800 to-blue-900 text-white flex items-center justify-center font-extrabold text-sm shadow-md ring-2 ring-blue-500/30 group-hover:scale-105 transition-transform">
-                RS
+                {getInitials(profile.name)}
               </div>
               <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white rounded-full p-0.5 ring-2 ring-white shadow-2xs">
                 <ShieldCheck className="w-3 h-3" />
@@ -101,7 +139,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTabTitle, onNavigateTab })
             {/* Profile Info */}
             <div className="text-left hidden sm:block">
               <div className="flex items-center gap-1">
-                <h4 className="text-xs font-extrabold text-slate-900 leading-tight">R. Sharma</h4>
+                <h4 className="text-xs font-extrabold text-slate-900 leading-tight">{profile.name}</h4>
                 <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isProfileOpen ? 'rotate-180 text-blue-600' : ''}`} />
               </div>
               <span className="text-[10px] text-blue-600 font-bold block mt-0.5 uppercase tracking-wide">
@@ -123,26 +161,26 @@ export const Header: React.FC<HeaderProps> = ({ activeTabTitle, onNavigateTab })
               >
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-xl bg-blue-600 text-white font-black text-base flex items-center justify-center shadow-inner ring-2 ring-white/20">
-                    RS
+                    {getInitials(profile.name)}
                   </div>
                   <div>
                     <h4 className="text-sm font-extrabold tracking-tight flex items-center gap-1.5">
-                      <span>R. Sharma</span>
+                      <span>{profile.name}</span>
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                     </h4>
-                    <span className="text-[11px] text-blue-300 font-semibold block">Senior Government Officer</span>
-                    <span className="text-[10px] text-slate-400 font-mono block mt-0.5">ID: GOV-PU-8942</span>
+                    <span className="text-[11px] text-blue-300 font-semibold block">{profile.designation}</span>
+                    <span className="text-[10px] text-slate-400 font-mono block mt-0.5">ID: {profile.govId}</span>
                   </div>
                 </div>
 
                 <div className="mt-3 pt-2.5 border-t border-slate-700/80 grid grid-cols-2 gap-2 text-[10px] text-slate-300 font-medium">
                   <div className="flex items-center gap-1.5 truncate">
                     <Mail className="w-3 h-3 text-blue-400" />
-                    <span className="truncate">r.sharma@gov.in</span>
+                    <span className="truncate">{profile.email}</span>
                   </div>
                   <div className="flex items-center gap-1.5 truncate">
                     <Building className="w-3 h-3 text-amber-400" />
-                    <span className="truncate">Pune Fire Dept</span>
+                    <span className="truncate">{profile.department}</span>
                   </div>
                 </div>
               </div>
