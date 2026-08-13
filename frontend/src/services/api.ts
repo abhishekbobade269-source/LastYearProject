@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://noc-verify-backend.onrender.com/api';
 
 export interface DashboardStats {
   totalSubmissions: number;
