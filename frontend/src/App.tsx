@@ -15,6 +15,13 @@ import { OfficerReviewView } from './components/OfficerReviewView';
 import { ApprovedNOCsView } from './components/ApprovedNOCsView';
 import { AuditTrailView } from './components/AuditTrailView';
 
+import { ProfileView } from './components/ProfileView';
+import { SecurityView } from './components/SecurityView';
+import { PermissionsView } from './components/PermissionsView';
+import { SettingsView } from './components/SettingsView';
+import { EntitiesView } from './components/EntitiesView';
+import { ReportsView } from './components/ReportsView';
+
 import { 
   fetchDashboardStats, 
   fetchSubmissions, 
@@ -70,7 +77,10 @@ export function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header activeTabTitle={activeTab.replace('-', ' ')} />
+        <Header 
+          activeTabTitle={activeTab.replace('-', ' ')} 
+          onNavigateTab={(tabId) => setActiveTab(tabId)}
+        />
 
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
           {activeTab === 'dashboard' && (
@@ -133,13 +143,28 @@ export function App() {
             <AuditTrailView />
           )}
 
-          {(activeTab === 'entities' || activeTab === 'reports' || activeTab === 'users-roles' || activeTab === 'settings') && (
-            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center space-y-3">
-              <h3 className="text-lg font-bold text-slate-800 capitalize">{activeTab.replace('-', ' ')} Module</h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Enterprise role-based permissions and system settings module active for NOC VERIFY Platform.
-              </p>
-            </div>
+          {activeTab === 'profile' && (
+            <ProfileView />
+          )}
+
+          {activeTab === 'security' && (
+            <SecurityView />
+          )}
+
+          {(activeTab === 'permissions' || activeTab === 'users-roles') && (
+            <PermissionsView />
+          )}
+
+          {activeTab === 'settings' && (
+            <SettingsView />
+          )}
+
+          {activeTab === 'entities' && (
+            <EntitiesView />
+          )}
+
+          {activeTab === 'reports' && (
+            <ReportsView />
           )}
         </main>
 
