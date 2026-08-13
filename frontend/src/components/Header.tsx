@@ -13,6 +13,7 @@ import {
   Mail,
   Building
 } from 'lucide-react';
+import { UserProfileModal } from './UserProfileModal';
 
 interface HeaderProps {
   activeTabTitle: string;
@@ -20,6 +21,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ activeTabTitle }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [modalTab, setModalTab] = useState<'profile' | 'security' | 'permissions' | 'settings' | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -32,6 +34,11 @@ export const Header: React.FC<HeaderProps> = ({ activeTabTitle }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const openTabModal = (tab: 'profile' | 'security' | 'permissions' | 'settings') => {
+    setModalTab(tab);
+    setIsProfileOpen(false);
+  };
 
   const handleLogout = () => {
     if (confirm('Are you sure you want to log out of NOC VERIFY Platform?')) {
@@ -109,7 +116,10 @@ export const Header: React.FC<HeaderProps> = ({ activeTabTitle }) => {
               onMouseLeave={() => setIsProfileOpen(false)}
             >
               {/* Profile Card Header */}
-              <div className="p-3 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 text-white rounded-xl mb-3 shadow-md relative overflow-hidden">
+              <div 
+                onClick={() => openTabModal('profile')}
+                className="p-3 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 text-white rounded-xl mb-3 shadow-md relative overflow-hidden cursor-pointer hover:opacity-95 transition-opacity"
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-xl bg-blue-600 text-white font-black text-base flex items-center justify-center shadow-inner ring-2 ring-white/20">
                     RS
@@ -139,7 +149,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTabTitle }) => {
               {/* Action Links */}
               <div className="space-y-1 text-xs font-semibold">
                 <button 
-                  onClick={() => alert('Opening Officer Profile Details...')}
+                  onClick={() => openTabModal('profile')}
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100/80 transition-colors cursor-pointer"
                 >
                   <User className="w-4 h-4 text-blue-600" />
@@ -147,7 +157,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTabTitle }) => {
                 </button>
 
                 <button 
-                  onClick={() => alert('Opening Change Password & Security Modal...')}
+                  onClick={() => openTabModal('security')}
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100/80 transition-colors cursor-pointer"
                 >
                   <Key className="w-4 h-4 text-amber-600" />
@@ -155,7 +165,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTabTitle }) => {
                 </button>
 
                 <button 
-                  onClick={() => alert('Role: Senior Officer (Full Approval Rights & Blockchain Signing)')}
+                  onClick={() => openTabModal('permissions')}
                   className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100/80 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
@@ -168,7 +178,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTabTitle }) => {
                 </button>
 
                 <button 
-                  onClick={() => alert('Opening Account Settings...')}
+                  onClick={() => openTabModal('settings')}
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100/80 transition-colors cursor-pointer"
                 >
                   <Settings className="w-4 h-4 text-slate-500" />
@@ -190,6 +200,15 @@ export const Header: React.FC<HeaderProps> = ({ activeTabTitle }) => {
           )}
         </div>
       </div>
+
+      {/* Connected Tab Modal */}
+      {modalTab && (
+        <UserProfileModal
+          isOpen={true}
+          initialTab={modalTab}
+          onClose={() => setModalTab(null)}
+        />
+      )}
     </header>
   );
 };
